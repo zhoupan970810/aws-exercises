@@ -5,6 +5,11 @@ pipeline {
     }
     stages {
         stage('increment version') {
+            when {
+                expression {
+                    return env.GIT_BRANCH == "main"
+                }
+            }
             steps {
                 script {
                     // enter app directory, because that's where package.json is located
@@ -39,6 +44,11 @@ pipeline {
             }
         }
         stage("Build and Push docker image") {
+            when {
+                expression {
+                    return env.GIT_BRANCH == "main"
+                }
+            }
             steps {
                 withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]){
                     sh "docker build -t zhoupan970810/aws-exercises:${TAG_NAME} . "
@@ -50,6 +60,11 @@ pipeline {
             }
         }
         stage('deploy to EC2') {
+            when {
+                expression {
+                    return env.GIT_BRANCH == "main"
+                }
+            }
             steps {
                 script {
                     def shellCmd = "bash ./server-cmds.sh ${TAG_NAME}"
@@ -64,6 +79,11 @@ pipeline {
             }
         }
         stage("commit version update") {
+            when {
+                expression {
+                    return env.GIT_BRANCH == "main"
+                }
+            }
             steps {
                 withCredentials([usernamePassword(credentialsId: 'github', usernameVariable: 'GIT_USR', passwordVariable: 'GIT_PASS')]){
                     sh 'git config --global user.email "jenkins@example.com"'
