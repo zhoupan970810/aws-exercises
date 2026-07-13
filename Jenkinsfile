@@ -1,0 +1,76 @@
+pipeline {
+    agent any
+    tools {
+        nodejs "node"
+    }
+    stages {
+        stage('increment version') {
+            steps {
+                script {
+                    // enter app directory, because that's where package.json is located
+                    dir("app") {
+                        // update application version in the package.json file with one of these release types: patch, minor or major
+                        // This command updates the minor version in package.json and ensures no Git commands are executed in the background, preventing automatic commits or tags in your Jenkins Pipeline
+                        sh "npm version minor -no-git-tag-version"
+
+                        // read the updated version from the package.json file
+                        def packageJson = readJSON file: 'package.json'
+                        def version = packageJson.version
+
+                        // set the new version as part of IMAGE_NAME
+                        env.IMAGE_NAME = "$version-$BUILD_NUMBER"
+                    }
+
+                    // alternative solution without Pipeline Utility Steps plugin:
+                    // def version = sh (returnStdout: true, script: "grep 'version' package.json | cut -d '\"' -f4 | tr '\\n' '\\0'")
+                    // env.IMAGE_NAME = "$version-$BUILD_NUMBER"
+                }
+            }
+        }
+        stage("Run test") {
+            steps {
+                script{
+                    dir("app"){
+                        // install all dependencies needed for running tests
+                        sh "npm install"
+                        sh "npm run test"
+                    }
+                }
+            }
+        }
+        stage("Build and Push docker image") {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]){
+                    sh "docker build -t zhoupan970810/aws-exercises:${IMAGE_NAME} . "
+                    sh """
+                            echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
+                           """
+                    sh "docker push zhoupan970810/aws-exercises:${IMAGE_NAME}"
+                }
+            }
+        }
+        stage("Deploy to EC2") {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]){
+                    sh "docker build -t zhoupan970810/aws-exercises:${IMAGE_NAME} . "
+                    sh """
+                            echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
+                           """
+                    sh "docker push zhoupan970810/aws-exercises:${IMAGE_NAME}"
+                }
+            }
+        }
+        stage("commit version update") {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'github', usernameVariable: 'GIT_USR', passwordVariable: 'GIT_PASS')]){
+                    sh 'git config --global user.email "jenkins@example.com"'
+                    sh 'git config --global user.name "jenkins"'
+                    sh 'git remote set-url origin https://${GIT_USR}:${GIT_PASS}@github.com/zhoupan970810/jenkins-exercises.git'
+                    sh 'git add .'
+                    sh 'git commit -m "ci: version bump"'
+                    sh 'git push origin HEAD:main'
+                }
+            }
+        }
+    }
+}
