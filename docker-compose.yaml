@@ -1,6 +1,6 @@
 version: '3.8'
 services:
   nodejs-app:
-    image: zhoupan970810/aws-exercises:${IMAGE}
+    image: zhoupan970810/aws-exercises:${TAG}
     ports:
       - 3000:3000
