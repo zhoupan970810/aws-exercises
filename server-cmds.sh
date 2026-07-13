@@ -1,5 +1,3 @@
-export TAG=$1
-export IMAGE="zhoupan970810/aws-exercises:${TAG}"
-echo "Using image: ${IMAGE}"
+export IMAGE=$1
 docker-compose -f docker-compose.yaml up --detach
 echo "success"
